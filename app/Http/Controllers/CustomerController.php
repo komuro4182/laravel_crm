@@ -3,7 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use GuzzleHttp\Client;
 use Illuminate\Http\Request;
+use App\Http\Requests\CustomerRequest;
+
 
 class CustomerController extends Controller
 {
@@ -14,7 +17,8 @@ class CustomerController extends Controller
      */
     public function index()
     {
-        return view('customers.index');
+        $customers = Customer::all();
+        return view('customers.index', compact('customers'));
     }
 
     /**
@@ -22,9 +26,25 @@ class CustomerController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create()
+    public function create(Request $request)
     {
-        return view('customers.create');
+        $method = 'GET';
+        $zipcode = $request->postcode;
+        $url = 'https://zipcloud.ibsnet.co.jp/api/search?zipcode=' . $zipcode;
+
+        $client = new Client();
+        try {
+            $response = $client->request($method, $url);
+            $body = $response->getBody();
+            $zip_cloud = json_decode($body, true);
+            $result = $zip_cloud['results'][0];
+            $address = $result['address1'].$result['address2'].$result['address3'];
+            $postcode = $result['zipcode'];
+        }catch(\Throwable $th){
+            $address = null;
+            $postcode = null;
+        }
+        return view('customers.create')->with(compact('address','postcode'));
     }
 
     public function postcode()
@@ -37,16 +57,16 @@ class CustomerController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request)
+    public function store(CustomerRequest $request)
     {
         $customer = new Customer;
         $customer->name = $request->name;
         $customer->email = $request->email;
         $customer->postcode = $request->postcode;
-        $customer->addres = $request->addres;
+        $customer->address = $request->address;
         $customer->phonenumber = $request->phonenumber;
         $customer->save();
-        return redirect('/custmer');
+        return redirect('/customers');
     }
 
     /**
@@ -55,10 +75,12 @@ class CustomerController extends Controller
      * @param  \App\Models\Customer  $customer
      * @return \Illuminate\Http\Response
      */
-    public function show(Customer $customer)
+    public function show($id)
     {
-        return view('customers.show');
+        $customer = Customer::find($id);
+        return view('customers.show',compact('customer'));
     }
+
 
     /**
      * Show the form for editing the specified resource.
@@ -66,9 +88,10 @@ class CustomerController extends Controller
      * @param  \App\Models\Customer  $customer
      * @return \Illuminate\Http\Response
      */
-    public function edit(Customer $customer)
+    public function edit($id)
     {
-        return view('customers.edit');
+        $customer = Customer::find($id);
+        return view('customers.edit',compact('customer'));
     }
 
     /**
@@ -78,9 +101,16 @@ class CustomerController extends Controller
      * @param  \App\Models\Customer  $customer
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, Customer $customer)
+    public function update(CustomerRequest $request, $id)
     {
-        
+        $customer = Customer::find($id);
+        $customer->name = $request->name;
+        $customer->email = $request->email;
+        $customer->postcode = $request->postcode;
+        $customer->address = $request->address;
+        $customer->phonenumber = $request->phonenumber;
+        $customer->save();
+        return redirect('/customers');
     }
 
     /**
@@ -89,9 +119,11 @@ class CustomerController extends Controller
      * @param  \App\Models\Customer  $customer
      * @return \Illuminate\Http\Response
      */
-    public function destroy(Customer $customer)
+    public function destroy($id)
     {
-        //
+        $customer = Customer::find($id);
+        $customer->delete();
+        return redirect('/customers');
     }
 
 
